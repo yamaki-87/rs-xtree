@@ -1,5 +1,7 @@
 use clap::{Arg, Command};
 
+use crate::{constatns, tree::SizeFormat};
+
 pub fn build_cli() -> Command {
     Command::new("rsxtree")
         .version("1.0")
@@ -25,6 +27,13 @@ pub fn build_cli() -> Command {
                 .help("Ignore directories or files")
                 .action(clap::ArgAction::Append)
                 .num_args(1..),
+        )
+        .arg(
+            Arg::new("size")
+                .short('s')
+                .long("size")
+                .help("See size")
+                .value_parser(clap::value_parser!(SizeFormat)),
         )
         .arg(
             Arg::new("depth")
