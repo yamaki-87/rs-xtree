@@ -1,10 +1,12 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use cli::build_cli;
-use tree::{build_tree, get_git_statuses, print_tree, tree_to_markdown, OutputFormat, Tree};
+use foramt::output::OutputFormat;
+use tree::{build_tree, get_git_statuses, print_tree, tree_to_markdown, Tree};
 
 mod cli;
 pub mod constatns;
+pub mod foramt;
 pub mod tree;
 pub mod utils;
 fn main() {
@@ -19,7 +21,10 @@ fn main() {
         HashMap::new()
     };
 
-    let tree_node = build_tree(&root, 1, &tree, &git_status).unwrap();
+    let mut tree_node = build_tree(&root, 1, &tree, &git_status).unwrap();
+    if tree.sort.is_some() {
+        tree_node.sort(&tree.sort.unwrap());
+    }
 
     match tree.output_format {
         OutputFormat::Json => {

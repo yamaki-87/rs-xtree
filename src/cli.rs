@@ -1,6 +1,9 @@
 use clap::{Arg, Command};
 
-use crate::{constatns, tree::SizeFormat};
+use crate::{
+    constatns,
+    foramt::{sizeformat::SizeFormat, sort::SortKey},
+};
 
 pub fn build_cli() -> Command {
     Command::new("rsxtree")
@@ -33,7 +36,15 @@ pub fn build_cli() -> Command {
                 .short('s')
                 .long("size")
                 .help("See size")
-                .value_parser(clap::value_parser!(SizeFormat)),
+                .value_parser(clap::value_parser!(SizeFormat))
+                .conflicts_with("long"),
+        )
+        .arg(
+            Arg::new("sort")
+                .short('S')
+                .long("sort")
+                .help("See sort")
+                .value_parser(clap::value_parser!(SortKey)),
         )
         .arg(
             Arg::new("depth")
@@ -62,5 +73,13 @@ pub fn build_cli() -> Command {
                 .long("git")
                 .help("show git diff status")
                 .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("long")
+                .short('l')
+                .long("long")
+                .help("show verbose infos")
+                .action(clap::ArgAction::SetTrue)
+                .conflicts_with("size"),
         )
 }

@@ -1,17 +1,41 @@
 use std::{
-    fs,
+    fmt, fs,
     path::{Path, PathBuf},
 };
 
 use anyhow::Result;
+use serde::Serialize;
 
-use super::size::Unit;
+#[cfg(target_os = "windows")]
+use std::os::windows::fs::MetadataExt;
 
-const ONE_KELE_BYTE: f32 = 1024.0;
+#[cfg(target_os = "unix")]
+use std::os::unix::fs::MetadataExt;
+
+use super::{
+    datetime::DateTimeWrap,
+    size::{Unit, ONE_KELE_BYTE_F32},
+};
+
 const FOUR_DIGITS: u64 = 9999;
 const SIX_DIGITS: u64 = 999999;
 const NINE_DIGITS: u64 = 999999999;
 const CURRENT_DIR: &str = ".";
+
+#[derive(Debug)]
+pub struct MetaDataInfo {
+    pub size: u64,
+
+    #[cfg(target_os = "unix")]
+    pub owner: u32,
+
+    #[cfg(target_os = "unix")]
+    pub group: u32,
+
+    pub created: DateTimeWrap,
+
+    pub modified: DateTimeWrap,
+}
 /// ## Summary
 /// パスからファイル名を取得
 /// "."の場合は現在のディレクトリ名を取得
@@ -88,14 +112,86 @@ pub fn get_human_readable_filesize<P: AsRef<Path>>(path: P) -> Result<Unit> {
     if size <= FOUR_DIGITS {
         Ok(Unit::Byte(size))
     } else if size <= SIX_DIGITS {
-        let kb_size = float_size / ONE_KELE_BYTE;
+        let kb_size = float_size / ONE_KELE_BYTE_F32;
         Ok(Unit::KByte(kb_size))
     } else if size <= NINE_DIGITS {
-        let mb_size = float_size / (ONE_KELE_BYTE.powi(2));
+        let mb_size = float_size / (ONE_KELE_BYTE_F32.powi(2));
         Ok(Unit::MByte(mb_size))
     } else {
-        let gb_size = float_size / ONE_KELE_BYTE.powi(3);
+        let gb_size = float_size / ONE_KELE_BYTE_F32.powi(3);
         Ok(Unit::GByte(gb_size))
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
+    use std::time::SystemTime;
+
+    let metadata = path.as_ref().metadata()?;
+    let size = if metadata.is_dir() {
+        get_filesize(path).unwrap_or_default()
+    } else if metadata.is_file() {
+        metadata.len()
+    } else {
+        // symbolicは0
+        0
+    };
+    let created = metadata.created().unwrap_or(SystemTime::UNIX_EPOCH);
+    let modified = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+
+    Ok(MetaDataInfo {
+        size,
+        created: DateTimeWrap::from(created),
+        modified: DateTimeWrap::from(modified),
+    })
+}
+
+#[cfg(target_os = "unix")]
+pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
+    let metadata = fs::metadata(path)?;
+    Ok(MetaDataInfo {
+        size: metadata.len(),
+        created: DateTimeWrap::from(metadata.ctime()),
+        modified: DateTimeWrap::from(metadata.mtime()),
+        owner: metadata.uid(),
+        group: metadata.gid(),
+    })
+}
+
+impl fmt::Display for MetaDataInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[cfg(target_os = "unix")]
+        {
+            write!(
+                f,
+                "Size: {} bytes | Created: {} | Modified: {} | Owner: {} | Group: {}",
+                self.size,
+                self.created.yyyy_mm_dd_format(),
+                self.modified.yyyy_mm_dd_format(),
+                self.owner,
+                self.group
+            )
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            write!(
+                f,
+                "Size: {} bytes | Created: {} | Modified: {}",
+                self.size,
+                self.created.yyyy_mm_dd_format(),
+                self.modified.yyyy_mm_dd_format()
+            )
+        }
+    }
+}
+
+impl Serialize for MetaDataInfo {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 
