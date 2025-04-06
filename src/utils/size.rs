@@ -4,13 +4,33 @@ use serde::Serialize;
 
 pub const ONE_KELE_BYTE_F32: f32 = 1024.0;
 pub const ONE_KELE_BYTE_F64: f64 = 1024.0;
-
+const FOUR_DIGITS: u64 = 9999;
+const SIX_DIGITS: u64 = 999999;
+const NINE_DIGITS: u64 = 999999999;
 #[derive(Debug, Clone)]
 pub enum Unit {
     Byte(u64),
     KByte(f32),
     MByte(f32),
     GByte(f32),
+}
+
+impl Unit {
+    pub fn new(size: u64) -> Unit {
+        let float_size = size as f32;
+        if size <= FOUR_DIGITS {
+            Unit::Byte(size)
+        } else if size <= SIX_DIGITS {
+            let kb_size = float_size / ONE_KELE_BYTE_F32;
+            Unit::KByte(kb_size)
+        } else if size <= NINE_DIGITS {
+            let mb_size = float_size / (ONE_KELE_BYTE_F32.powi(2));
+            Unit::MByte(mb_size)
+        } else {
+            let gb_size = float_size / ONE_KELE_BYTE_F32.powi(3);
+            Unit::GByte(gb_size)
+        }
+    }
 }
 
 impl Display for Unit {

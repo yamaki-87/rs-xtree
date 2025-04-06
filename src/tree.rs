@@ -354,7 +354,7 @@ pub fn build_tree(
     }
 }
 
-#[async_recursion(?Send)]
+#[async_recursion]
 pub async fn build_tree_async(
     path: &Path,
     depth: u32,
@@ -398,12 +398,13 @@ pub async fn build_tree_async(
         }
         let size = if let Some(size) = &tree.size {
             match size {
-                SizeFormat::Bytes => utils::files::get_filesize_async(&path)
+                SizeFormat::Bytes => utils::files::get_filesize_async_safe(&path)
                     .await
                     .map_err(|e| eprintln!("ERROR: {}", e))
                     .ok()
                     .map(|s| size::Unit::Byte(s)),
-                SizeFormat::HumanReadable => utils::files::get_human_readable_filesize(&path)
+                SizeFormat::HumanReadable => utils::files::get_human_readable_filesize_async(&path)
+                    .await
                     .map_err(|e| eprintln!("{}", e))
                     .ok(),
             }

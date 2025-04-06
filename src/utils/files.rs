@@ -18,9 +18,6 @@ use super::{
     size::{Unit, ONE_KELE_BYTE_F32},
 };
 
-const FOUR_DIGITS: u64 = 9999;
-const SIX_DIGITS: u64 = 999999;
-const NINE_DIGITS: u64 = 999999999;
 const CURRENT_DIR: &str = ".";
 
 #[derive(Debug)]
@@ -119,7 +116,7 @@ pub fn get_filesize<P: AsRef<Path>>(directory: P) -> Result<u64> {
 ///```
 ///
 ///```
-pub async fn get_filesize_async<P: AsRef<Path>>(directory: P) -> Result<u64> {
+pub async fn get_filesize_async_unsafe<P: AsRef<Path>>(directory: P) -> Result<u64> {
     let mut sum_size = 0;
     let mut entries = tokio::fs::read_dir(directory).await?;
 
@@ -135,6 +132,44 @@ pub async fn get_filesize_async<P: AsRef<Path>>(directory: P) -> Result<u64> {
     Ok(sum_size)
 }
 
+/// ## Summary
+/// async用ファイルサイズ取得関数
+///
+/// ## Note
+/// この関数はマルチスレッド用テスト
+///
+/// ## Parameters
+/// - `directory`:
+///
+/// ## Returns
+///
+/// ## Examples
+///```
+///
+///```
+pub async fn get_filesize_async_safe<P: AsRef<Path>>(directory: P) -> Result<u64> {
+    let start = directory.as_ref();
+    let mut sum_size = 0u64;
+    let mut stack = vec![start.to_path_buf()];
+
+    while let Some(dir) = stack.pop() {
+        let mut entries = match tokio::fs::read_dir(&dir).await {
+            Ok(e) => e,
+            Err(e) => return Err(e.into()),
+        };
+
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let metadata = entry.metadata().await?;
+            if metadata.is_file() {
+                sum_size += metadata.len();
+            } else if metadata.is_dir() {
+                stack.push(entry.path());
+            }
+        }
+    }
+
+    Ok(sum_size)
+}
 pub fn get_human_readable_filesize<P: AsRef<Path>>(path: P) -> Result<Unit> {
     let size = if path.as_ref().is_file() {
         let meta = path.as_ref().metadata()?;
@@ -142,19 +177,19 @@ pub fn get_human_readable_filesize<P: AsRef<Path>>(path: P) -> Result<Unit> {
     } else {
         get_filesize(path)?
     };
-    let float_size = size as f32;
-    if size <= FOUR_DIGITS {
-        Ok(Unit::Byte(size))
-    } else if size <= SIX_DIGITS {
-        let kb_size = float_size / ONE_KELE_BYTE_F32;
-        Ok(Unit::KByte(kb_size))
-    } else if size <= NINE_DIGITS {
-        let mb_size = float_size / (ONE_KELE_BYTE_F32.powi(2));
-        Ok(Unit::MByte(mb_size))
+
+    Ok(Unit::new(size))
+}
+
+pub async fn get_human_readable_filesize_async<P: AsRef<Path>>(path: P) -> Result<Unit> {
+    let size = if path.as_ref().is_file() {
+        let meta = tokio::fs::metadata(path).await?;
+        meta.len()
     } else {
-        let gb_size = float_size / ONE_KELE_BYTE_F32.powi(3);
-        Ok(Unit::GByte(gb_size))
-    }
+        get_filesize_async_safe(path).await?
+    };
+
+    Ok(Unit::new(size))
 }
 
 #[cfg(target_os = "windows")]
