@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
+use async_recursion::async_recursion;
 use serde::Serialize;
 
 #[cfg(target_os = "windows")]
@@ -101,6 +102,39 @@ pub fn get_filesize<P: AsRef<Path>>(directory: P) -> Result<u64> {
     Ok(sum_size)
 }
 
+#[async_recursion(?Send)]
+/// ## Summary
+/// async用ファイルサイズ取得関数
+///
+/// ## Note
+/// この関数はマルチスレッドで使わないでください。
+/// マルチスレッド用に設計されてないです
+///
+/// ## Parameters
+/// - `directory`:
+///
+/// ## Returns
+///
+/// ## Examples
+///```
+///
+///```
+pub async fn get_filesize_async<P: AsRef<Path>>(directory: P) -> Result<u64> {
+    let mut sum_size = 0;
+    let mut entries = tokio::fs::read_dir(directory).await?;
+
+    while let Some(entry) = entries.next_entry().await? {
+        let metadata = entry.metadata().await?;
+        if metadata.is_file() {
+            sum_size += metadata.len();
+        } else if metadata.is_dir() {
+            sum_size += get_filesize(entry.path())?;
+        }
+    }
+
+    Ok(sum_size)
+}
+
 pub fn get_human_readable_filesize<P: AsRef<Path>>(path: P) -> Result<Unit> {
     let size = if path.as_ref().is_file() {
         let meta = path.as_ref().metadata()?;
@@ -146,9 +180,45 @@ pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     })
 }
 
+#[cfg(target_os = "windows")]
+pub async fn get_metadata_async<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
+    use std::time::SystemTime;
+
+    let p = path.as_ref();
+    let metadata = tokio::fs::metadata(p).await?;
+    let size = if metadata.is_dir() {
+        get_filesize(p).unwrap_or_default()
+    } else if metadata.is_file() {
+        metadata.len()
+    } else {
+        // symbolicは0
+        0
+    };
+    let created = metadata.created().unwrap_or(SystemTime::UNIX_EPOCH);
+    let modified = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+
+    Ok(MetaDataInfo {
+        size,
+        created: DateTimeWrap::from(created),
+        modified: DateTimeWrap::from(modified),
+    })
+}
+
 #[cfg(target_os = "unix")]
 pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     let metadata = fs::metadata(path)?;
+    Ok(MetaDataInfo {
+        size: metadata.len(),
+        created: DateTimeWrap::from(metadata.ctime()),
+        modified: DateTimeWrap::from(metadata.mtime()),
+        owner: metadata.uid(),
+        group: metadata.gid(),
+    })
+}
+
+#[cfg(target_os = "unix")]
+pub async fn get_metadata_async<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
+    let metadata = tokio::fs::metadata(path)?;
     Ok(MetaDataInfo {
         size: metadata.len(),
         created: DateTimeWrap::from(metadata.ctime()),

@@ -2,7 +2,7 @@ use clap::{Arg, Command};
 
 use crate::{
     constatns,
-    foramt::{sizeformat::SizeFormat, sort::SortKey},
+    foramt::{mode::Mode, sizeformat::SizeFormat, sort::SortKey},
 };
 
 pub fn build_cli() -> Command {
@@ -81,5 +81,12 @@ pub fn build_cli() -> Command {
                 .help("show verbose infos")
                 .action(clap::ArgAction::SetTrue)
                 .conflicts_with("size"),
+        )
+        .arg(
+            Arg::new("mode")
+                .long("mode")
+                .help("execute async or sync")
+                .value_parser(clap::value_parser!(Mode))
+                .default_value("sync"),
         )
 }

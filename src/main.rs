@@ -2,14 +2,16 @@ use std::{collections::HashMap, path::PathBuf};
 
 use cli::build_cli;
 use foramt::output::OutputFormat;
-use tree::{build_tree, get_git_statuses, print_tree, tree_to_markdown, Tree};
+use tree::{build_tree, build_tree_async, get_git_statuses, print_tree, tree_to_markdown, Tree};
 
 mod cli;
 pub mod constatns;
 pub mod foramt;
 pub mod tree;
 pub mod utils;
-fn main() {
+
+#[tokio::main]
+async fn main() {
     let matches = build_cli().get_matches();
     let tree = Tree::new(&matches);
     println!("{:?}", &tree);
@@ -21,7 +23,12 @@ fn main() {
         HashMap::new()
     };
 
-    let mut tree_node = build_tree(&root, 1, &tree, &git_status).unwrap();
+    let mut tree_node = match &tree.mode {
+        foramt::mode::Mode::Async => build_tree(&root, 1, &tree, &git_status).unwrap(),
+        foramt::mode::Mode::Sync => build_tree_async(&root, 1, &tree, &git_status)
+            .await
+            .unwrap(),
+    };
     if tree.sort.is_some() {
         tree_node.sort(&tree.sort.unwrap());
     }

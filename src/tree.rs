@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
 };
 
+use async_recursion::async_recursion;
 use clap::ValueEnum;
 use colored::{ColoredString, Colorize};
 use git2::{Repository, Status};
@@ -12,7 +13,7 @@ use serde::Serialize;
 
 use crate::{
     constatns::{self, STR_EMPTY},
-    foramt::{output::OutputFormat, sizeformat::SizeFormat, sort::SortKey},
+    foramt::{mode::Mode, output::OutputFormat, sizeformat::SizeFormat, sort::SortKey},
     utils::{self, files::MetaDataInfo, size},
 };
 
@@ -32,6 +33,7 @@ pub struct Tree {
     pub git_intergration: bool,
     verbose: bool,
     pub sort: Option<SortKey>,
+    pub mode: Mode,
 }
 
 #[derive(Serialize, Debug)]
@@ -145,6 +147,7 @@ impl Tree {
         let git_intergration = matches.get_flag("git");
 
         let mut is_verbose = matches.get_flag("long");
+        let mode = matches.get_one::<Mode>("mode").cloned().unwrap();
 
         // TODO sortによってフラグをtrueにする処理無理矢理感があるので修正
         let sort = matches.get_one::<SortKey>("sort").cloned();
@@ -173,6 +176,7 @@ impl Tree {
             git_intergration: git_intergration,
             verbose: is_verbose,
             sort: sort,
+            mode: mode,
         }
     }
 
@@ -185,7 +189,21 @@ impl Tree {
             .unwrap_or(false)
     }
 
+    fn ext_filter_tokio(&self, entry: &tokio::fs::DirEntry) -> bool {
+        !entry
+            .path()
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| self.extensions.contains(&ext.to_string()))
+            .unwrap_or(false)
+    }
+
     fn ignore_filename_filter(&self, entry: &DirEntry) -> bool {
+        let filename = entry.file_name().to_string_lossy().to_string();
+        !self.ignores.contains(&filename)
+    }
+
+    fn ignore_filename_filter_tokio(&self, entry: &tokio::fs::DirEntry) -> bool {
         let filename = entry.file_name().to_string_lossy().to_string();
         !self.ignores.contains(&filename)
     }
@@ -290,6 +308,98 @@ pub fn build_tree(
         let size = if let Some(size) = &tree.size {
             match size {
                 SizeFormat::Bytes => utils::files::get_filesize(&path)
+                    .map_err(|e| eprintln!("ERROR: {}", e))
+                    .ok()
+                    .map(|s| size::Unit::Byte(s)),
+                SizeFormat::HumanReadable => utils::files::get_human_readable_filesize(&path)
+                    .map_err(|e| eprintln!("{}", e))
+                    .ok(),
+            }
+        } else {
+            None
+        };
+
+        Some(TreeNode {
+            name,
+            git_status: git_status,
+            children: if children.is_empty() {
+                None
+            } else {
+                Some(children)
+            },
+            size: size,
+            vervose_info: vervose_info,
+        })
+    } else {
+        let size = if let Some(size_format) = &tree.size {
+            match size_format {
+                SizeFormat::Bytes => {
+                    let metadata = path.metadata().map_err(|e| eprintln!("ERROR: {}", e)).ok();
+                    metadata.map(|m| size::Unit::Byte(m.len()))
+                }
+                SizeFormat::HumanReadable => utils::files::get_human_readable_filesize(path)
+                    .map_err(|e| eprintln!("ERROR:{}", e))
+                    .ok(),
+            }
+        } else {
+            None
+        };
+        Some(TreeNode {
+            name,
+            git_status: git_status,
+            children: None,
+            size: size,
+            vervose_info: vervose_info,
+        })
+    }
+}
+
+#[async_recursion(?Send)]
+pub async fn build_tree_async(
+    path: &Path,
+    depth: u32,
+    tree: &Tree,
+    git_statuses: &HashMap<PathBuf, Status>,
+) -> Option<TreeNode> {
+    if let Some(max_depth) = tree.max_depth {
+        if depth > max_depth {
+            return None;
+        }
+    }
+    let name = utils::files::get_filename(path);
+    if tree.ignores.contains(&name) {
+        return None;
+    }
+
+    let git_status = git_statuses.get(path).map(|status| format!("{:?}", status));
+
+    let vervose_info = if tree.verbose {
+        utils::files::get_metadata_async(&path)
+            .await
+            .map_err(|e| eprintln!("ERROR: {}", e))
+            .ok()
+    } else {
+        None
+    };
+
+    if path.is_dir() {
+        let mut entries = tokio::fs::read_dir(path).await.ok()?;
+
+        let mut children = vec![];
+        while let Some(entry) = entries.next_entry().await.ok()? {
+            if !tree.ext_filter_tokio(&entry) {
+                continue;
+            }
+            if !tree.ignore_filename_filter_tokio(&entry) {
+                continue;
+            }
+            let child = build_tree_async(&entry.path(), depth + 1, tree, git_statuses).await?;
+            children.push(child);
+        }
+        let size = if let Some(size) = &tree.size {
+            match size {
+                SizeFormat::Bytes => utils::files::get_filesize_async(&path)
+                    .await
                     .map_err(|e| eprintln!("ERROR: {}", e))
                     .ok()
                     .map(|s| size::Unit::Byte(s)),
