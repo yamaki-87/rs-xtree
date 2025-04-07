@@ -2,14 +2,15 @@ use std::{collections::HashMap, path::PathBuf};
 
 use cli::build_cli;
 use foramt::output::OutputFormat;
+use stats::Stats;
 use tree::{build_tree, build_tree_async, get_git_statuses, print_tree, tree_to_markdown, Tree};
 
 mod cli;
 pub mod constatns;
 pub mod foramt;
+pub mod stats;
 pub mod tree;
 pub mod utils;
-
 #[tokio::main]
 async fn main() {
     let matches = build_cli().get_matches();
@@ -42,6 +43,11 @@ async fn main() {
         }
         OutputFormat::Markdown => {
             println!("{}", tree_to_markdown(&tree_node, 0));
+        }
+        OutputFormat::Stats => {
+            let mut stats = stats::Stats::empty();
+            stats.collect_stats(&tree_node);
+            stats.print_stats();
         }
         _ => {
             println!("yet")

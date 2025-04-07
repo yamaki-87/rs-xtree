@@ -14,7 +14,11 @@ use serde::Serialize;
 use crate::{
     constatns::{self, STR_EMPTY},
     foramt::{mode::Mode, output::OutputFormat, sizeformat::SizeFormat, sort::SortKey},
-    utils::{self, files::MetaDataInfo, size},
+    utils::{
+        self,
+        files::MetaDataInfo,
+        size::{self, Unit},
+    },
 };
 
 const TREE_BRANCH: &str = " ├── ";
@@ -49,6 +53,21 @@ pub struct TreeNode {
 }
 
 impl TreeNode {
+    pub fn new(
+        name: String,
+        git_status: Option<String>,
+        children: Option<Vec<TreeNode>>,
+        size: Option<size::Unit>,
+        verbose_info: Option<MetaDataInfo>,
+    ) -> Self {
+        Self {
+            name: name,
+            git_status: git_status,
+            children: children,
+            size: size,
+            vervose_info: verbose_info,
+        }
+    }
     /// ## Summary
     /// -s でサイズフラグがtrueであればsizeを表示
     /// -l でロングフラがtrueであれば詳細な情報を表示
@@ -120,6 +139,18 @@ impl TreeNode {
             });
         }
     }
+
+    pub fn get_children(&self) -> &Option<Vec<TreeNode>> {
+        &self.children
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_size(&self) -> &Option<Unit> {
+        &self.size
+    }
 }
 
 impl Tree {
@@ -140,6 +171,8 @@ impl Tree {
             OutputFormat::Json
         } else if matches.get_flag("markdown") {
             OutputFormat::Markdown
+        } else if matches.get_flag("stats") {
+            OutputFormat::Stats
         } else {
             OutputFormat::Standard
         };
@@ -455,4 +488,21 @@ pub fn tree_to_markdown(node: &TreeNode, depth: usize) -> String {
         }
     }
     markdown
+}
+
+pub fn collect_stats(node: &TreeNode, stats: &mut HashMap<String, (u64, f64)>) {
+    if let Some(children) = &node.children {
+        for child in children {
+            collect_stats(child, stats);
+        }
+    }
+
+    if let Some(ext) = Path::new(&node.name).extension().and_then(|e| e.to_str()) {
+        let entry = stats.entry(ext.to_string()).or_insert((0, 0f64));
+        entry.0 += 1;
+
+        if let Some(size) = &node.size {
+            entry.1 += size.to_bytes_f64();
+        }
+    }
 }

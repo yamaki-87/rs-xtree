@@ -1,26 +1,32 @@
 # RS-XTree
 
-`RS-XTree`は、Rust で作成されたカスタマイズ可能な CLI 版の tree コマンドです。Windows 標準の tree コマンドではできない柔軟なファイル構造表示や Git 連携が可能です。
+**RS-XTree** is a customizable CLI tree viewer written in Rust.  
+It offers more flexible and powerful file structure display compared to the built-in `tree` command on Windows, and includes Git integration, filtering, and asynchronous execution.
 
-## 特徴
+---
 
-- 標準のツリー表示
-- JSON および Markdown 形式の出力
-- 特定拡張子でのフィルター表示
-- 指定したファイルやディレクトリを除外可能
-- Git 差分ステータス表示
-- ファイルサイズを表示
-- ファイルやディレクトリの詳細な情報を表示
-- サイズ、名前、作成日時順で sort
-- **非同期・同期モードの切り替えによる柔軟なパフォーマンスチューニング**
+## Features
 
-## インストール方法
+- Standard directory tree view
+- Output in **JSON** and **Markdown**
+- Filter by file extension
+- Ignore specific files or directories
+- Display Git diff status
+- Show file and directory sizes
+- Display detailed file metadata
+- Sort by size, name, or creation time
+- **Choose execution mode: sync / async**
+- Display file extension statistics
+
+---
+
+## Installation
 
 ```bash
 cargo install --path .
 ```
 
-## 使い方
+## Usage
 
 ```bash
 rs-xtree [OPTIONS] [PATH]
@@ -28,68 +34,55 @@ rs-xtree [OPTIONS] [PATH]
 
 ### オプション一覧
 
-| オプション     | 説明                                                                                 |
-| -------------- | ------------------------------------------------------------------------------------ |
-| `-e, --ext`    | 特定の拡張子のファイルのみ表示                                                       |
-| `-i, --ignore` | 除外するファイルやディレクトリを指定                                                 |
-| `-d, --depth`  | ツリー表示する最大深さを指定                                                         |
-| `-j, --json`   | JSON 形式での出力                                                                    |
-| `-m, --md`     | Markdown 形式での出力                                                                |
-| `-g, --git`    | Git の差分（変更、新規など）を表示                                                   |
-| `-s, --size`   | ファイルサイズ、ディレクトリサイズを `b` (バイトサイズ) / `h` (読みやすい単位)で表示 |
-| `-l, --long`   | ファイル、ディレクトリの詳細な情報を表示( `-s` (サイズ表示フラグ) と併用は不可)      |
-| `-S, --sort`   | tree を `s` (サイズ) / `n` (名前) / `t` (作成日時順)でソート                         |
-| `--mode`       | ツリー構築処理の方式を選択：`sync`（同期）/ `async`（非同期）                        |
+| オプション     | 説明                                                          |
+| -------------- | ------------------------------------------------------------- |
+| `-e, --ext`    | Show only files with the specified extension                  |
+| `-i, --ignore` | Exclude specific files or directories                         |
+| `-d, --depth`  | Limit the maximum depth of the tree                           |
+| `-j, --json`   | Output as JSON                                                |
+| `-m, --md`     | Output as Markdown                                            |
+| `-g, --git`    | Display Git status (modified, new, etc.)                      |
+| `-s, --size`   | Show sizes: b (bytes) or h (human readable)                   |
+| `-l, --long`   | Show detailed file info (not combinable with -s)              |
+| `-S, --sort`   | Sort by: s (size), n (name), t (timestamp)                    |
+| `--mode`       | Execution mode: sync (default), async                         |
+| `--stats`      | Aggregate and display file counts and total size by extension |
 
-### 例
+### Examples
 
 ```bash
-# 現在のディレクトリを標準で表示
-rs-xtree
+rs-xtree                      # Default tree output
 
-# 特定拡張子だけ表示 (.rs)
-rs-xtree --ext rs
+rs-xtree --ext rs            # Show only .rs files
 
-# 「target」と「node_modules」フォルダを無視して表示
-rs-xtree --ignore target node_modules
+rs-xtree --ignore target     # Ignore `target` directory
 
-# JSON形式で表示
-rs-xtree --json
+rs-xtree --json              # Output as JSON
 
-# Markdown形式で表示
-rs-xtree --md
+rs-xtree --md                # Output as Markdown
 
-# Gitの差分も表示
-rs-xtree --git
+rs-xtree --git               # Show Git status
 
-# ファイルサイズ、ディレクトリサイズをバイト形式で表示
-rs-xtree -s b
+rs-xtree -s b                # Show sizes in bytes
 
-# ファイルサイズ、ディレクトリサイズを読みやすい形式で表示
-rs-xtree -s h
+rs-xtree -s h                # Show sizes in human-readable format
 
-# ファイルやディレクトリの詳細な情報を表示
-rs-xtree -l
+rs-xtree -l                  # Show detailed file/directory info
 
-# ファイルやディレクトリを作成日時でsortします
-rs-xtree -S t
+rs-xtree -S t                # Sort by creation time
 
-# ファイルやディレクトリを名前でsortします
-rs-xtree -S n
+rs-xtree -S n                # Sort by name
 
-# ファイルやディレクトリをサイズでsortします
-rs-xtree -S s
+rs-xtree -S s                # Sort by size
 
-# 非同期でツリーを構築（ファイル数が多い場合に高速）
-rs-xtree --mode async
+rs-xtree --mode async        # Use asynchronous tree building
 
-# 同期（デフォルト動作）
-rs-xtree --mode sync
+rs-xtree --stats             # Show file extension statistics
 ```
 
-## 出力例
+## Output Examples
 
-### 標準
+### Tree
 
 ```
 my_project
@@ -133,6 +126,20 @@ my_project
 }
 ```
 
+### STATS
+
+```
+Extension    Count    Total Size
+--------------------------------
+md           1        4156 Bytes
+(no ext)     165      1274923835 Bytes
+sample       13       23513 Bytes
+txt          1        11809 Bytes
+lock         1        29174 Bytes
+toml         1        400 Bytes
+rs           15       36587 Bytes
+```
+
 ## ライセンス
 
-MIT ライセンス
+MIT License

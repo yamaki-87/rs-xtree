@@ -37,7 +37,8 @@ pub fn build_cli() -> Command {
                 .long("size")
                 .help("See size")
                 .value_parser(clap::value_parser!(SizeFormat))
-                .conflicts_with("long"),
+                .conflicts_with("long")
+                .default_value("b"),
         )
         .arg(
             Arg::new("sort")
@@ -88,5 +89,11 @@ pub fn build_cli() -> Command {
                 .help("execute async or sync")
                 .value_parser(clap::value_parser!(Mode))
                 .default_value("sync"),
+        )
+        .arg(
+            Arg::new("stats")
+                .long("stats")
+                .help("show directory stats")
+                .action(clap::ArgAction::SetTrue),
         )
 }

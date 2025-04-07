@@ -54,7 +54,7 @@ impl Serialize for Unit {
 }
 
 impl Unit {
-    fn to_bytes_f64(&self) -> f64 {
+    pub fn to_bytes_f64(&self) -> f64 {
         match self {
             Unit::Byte(b) => *b as f64,
             Unit::KByte(kb) => *kb as f64 * ONE_KELE_BYTE_F64,
