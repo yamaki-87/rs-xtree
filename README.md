@@ -1,3 +1,5 @@
+[日本語はこちら 🇯🇵](./README.ja.md)
+
 # RS-XTree
 
 **RS-XTree** is a customizable CLI tree viewer written in Rust.  
