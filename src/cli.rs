@@ -1,4 +1,4 @@
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 
 use crate::{
     constatns,
@@ -37,8 +37,7 @@ pub fn build_cli() -> Command {
                 .long("size")
                 .help("See size")
                 .value_parser(clap::value_parser!(SizeFormat))
-                .conflicts_with("long")
-                .default_value("b"),
+                .conflicts_with("long"),
         )
         .arg(
             Arg::new("sort")
@@ -86,7 +85,7 @@ pub fn build_cli() -> Command {
         .arg(
             Arg::new("mode")
                 .long("mode")
-                .help("execute async or sync")
+                .help("execute async or sync or parallel")
                 .value_parser(clap::value_parser!(Mode))
                 .default_value("sync"),
         )
@@ -95,5 +94,12 @@ pub fn build_cli() -> Command {
                 .long("stats")
                 .help("show directory stats")
                 .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("all")
+                .short('a')
+                .long("all")
+                .help("Show hidden files and directories")
+                .action(ArgAction::SetTrue),
         )
 }

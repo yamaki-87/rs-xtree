@@ -17,7 +17,7 @@ It offers more flexible and powerful file structure display compared to the buil
 - Show file and directory sizes
 - Display detailed file metadata
 - Sort by size, name, or creation time
-- **Choose execution mode: sync / async**
+- **Choose execution mode: sync / parallel**
 - Display file extension statistics
 
 ---
@@ -47,8 +47,9 @@ rs-xtree [OPTIONS] [PATH]
 | `-s, --size`   | Show sizes: b (bytes) or h (human readable)                   |
 | `-l, --long`   | Show detailed file info (not combinable with -s)              |
 | `-S, --sort`   | Sort by: s (size), n (name), t (timestamp)                    |
-| `--mode`       | Execution mode: sync (default), async                         |
+| `--mode`       | Execution mode: sync (default), parallel                      |
 | `--stats`      | Aggregate and display file counts and total size by extension |
+| `-a, --all`    | Show hidden files and directories (those starting with `.`)   |
 
 ### Examples
 
@@ -77,9 +78,11 @@ rs-xtree -S n                # Sort by name
 
 rs-xtree -S s                # Sort by size
 
-rs-xtree --mode async        # Use asynchronous tree building
+rs-xtree --mode p        # Use parallel tree building
 
 rs-xtree --stats             # Show file extension statistics
+
+rs-xtree -a                 # Show hidden files and folders (e.g., .git, .env)
 ```
 
 ## Output Examples

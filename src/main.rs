@@ -3,7 +3,10 @@ use std::{collections::HashMap, path::PathBuf};
 use cli::build_cli;
 use foramt::output::OutputFormat;
 use stats::Stats;
-use tree::{build_tree, build_tree_async, get_git_statuses, print_tree, tree_to_markdown, Tree};
+use tree::{
+    build_tree, build_tree_async, build_tree_parallel, get_git_statuses, print_tree,
+    tree_to_markdown, Tree,
+};
 
 mod cli;
 pub mod constatns;
@@ -15,7 +18,9 @@ pub mod utils;
 async fn main() {
     let matches = build_cli().get_matches();
     let tree = Tree::new(&matches);
-    println!("{:?}", &tree);
+    if cfg!(debug_assertions) {
+        println!("{:?}", &tree);
+    }
 
     let root = PathBuf::from(&tree.path);
     let git_status = if tree.git_intergration {
@@ -25,10 +30,11 @@ async fn main() {
     };
 
     let mut tree_node = match &tree.mode {
-        foramt::mode::Mode::Async => build_tree(&root, 1, &tree, &git_status).unwrap(),
-        foramt::mode::Mode::Sync => build_tree_async(&root, 1, &tree, &git_status)
+        foramt::mode::Mode::Async => build_tree_async(&root, 1, &tree, &git_status)
             .await
             .unwrap(),
+        foramt::mode::Mode::Sync => build_tree(&root, 1, &tree, &git_status).unwrap(),
+        foramt::mode::Mode::Parallel => build_tree_parallel(&root, 1, &tree, &git_status).unwrap(),
     };
     if tree.sort.is_some() {
         tree_node.sort(&tree.sort.unwrap());

@@ -9,6 +9,7 @@ use async_recursion::async_recursion;
 use clap::ValueEnum;
 use colored::{ColoredString, Colorize};
 use git2::{Repository, Status};
+use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::{
@@ -38,6 +39,7 @@ pub struct Tree {
     verbose: bool,
     pub sort: Option<SortKey>,
     pub mode: Mode,
+    is_show_hidden: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -199,6 +201,8 @@ impl Tree {
                 _ => {}
             }
         }
+
+        let is_show_hidden = matches.get_flag("all");
         Self {
             path: path,
             extensions: exts,
@@ -210,6 +214,7 @@ impl Tree {
             verbose: is_verbose,
             sort: sort,
             mode: mode,
+            is_show_hidden: is_show_hidden,
         }
     }
 
@@ -315,6 +320,12 @@ pub fn build_tree(
         }
     }
     let name = utils::files::get_filename(path);
+
+    // -aが指定されてないかつ隠しフォルダーならskip
+    if !tree.is_show_hidden && name.starts_with(".") {
+        return None;
+    }
+
     if tree.ignores.contains(&name) {
         return None;
     }
@@ -387,6 +398,95 @@ pub fn build_tree(
     }
 }
 
+pub fn build_tree_parallel(
+    path: &Path,
+    depth: u32,
+    tree: &Tree,
+    git_statuses: &HashMap<PathBuf, Status>,
+) -> Option<TreeNode> {
+    if let Some(max_depth) = tree.max_depth {
+        if depth > max_depth {
+            return None;
+        }
+    }
+    let name = utils::files::get_filename(path);
+    // -aが指定されてないかつ隠しフォルダーならskip
+    if !tree.is_show_hidden && name.starts_with(".") {
+        return None;
+    }
+    if tree.ignores.contains(&name) {
+        return None;
+    }
+
+    let git_status = git_statuses.get(path).map(|status| format!("{:?}", status));
+
+    let vervose_info = if tree.verbose {
+        utils::files::get_metadata(&path)
+            .map_err(|e| eprintln!("ERROR: {}", e))
+            .ok()
+    } else {
+        None
+    };
+
+    if path.is_dir() {
+        let children: Vec<TreeNode> = fs::read_dir(&path)
+            .ok()?
+            .par_bridge()
+            .filter_map(Result::ok)
+            .filter(|entry| tree.ext_filter(entry))
+            .filter(|entry| tree.ignore_filename_filter(entry))
+            .filter_map(|entry| build_tree_parallel(&entry.path(), depth + 1, tree, git_statuses))
+            .collect();
+
+        let size = if let Some(size) = &tree.size {
+            match size {
+                SizeFormat::Bytes => utils::files::get_filesize(&path)
+                    .map_err(|e| eprintln!("ERROR: {}", e))
+                    .ok()
+                    .map(|s| size::Unit::Byte(s)),
+                SizeFormat::HumanReadable => utils::files::get_human_readable_filesize(&path)
+                    .map_err(|e| eprintln!("{}", e))
+                    .ok(),
+            }
+        } else {
+            None
+        };
+
+        Some(TreeNode {
+            name,
+            git_status: git_status,
+            children: if children.is_empty() {
+                None
+            } else {
+                Some(children)
+            },
+            size: size,
+            vervose_info: vervose_info,
+        })
+    } else {
+        let size = if let Some(size_format) = &tree.size {
+            match size_format {
+                SizeFormat::Bytes => {
+                    let metadata = path.metadata().map_err(|e| eprintln!("ERROR: {}", e)).ok();
+                    metadata.map(|m| size::Unit::Byte(m.len()))
+                }
+                SizeFormat::HumanReadable => utils::files::get_human_readable_filesize(path)
+                    .map_err(|e| eprintln!("ERROR:{}", e))
+                    .ok(),
+            }
+        } else {
+            None
+        };
+        Some(TreeNode {
+            name,
+            git_status: git_status,
+            children: None,
+            size: size,
+            vervose_info: vervose_info,
+        })
+    }
+}
+
 #[async_recursion]
 pub async fn build_tree_async(
     path: &Path,
@@ -400,6 +500,10 @@ pub async fn build_tree_async(
         }
     }
     let name = utils::files::get_filename(path);
+    // -aが指定されてないかつ隠しフォルダーならskip
+    if !tree.is_show_hidden && name.starts_with(".") {
+        return None;
+    }
     if tree.ignores.contains(&name) {
         return None;
     }
