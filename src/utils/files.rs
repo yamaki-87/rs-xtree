@@ -7,10 +7,10 @@ use anyhow::Result;
 use async_recursion::async_recursion;
 use serde::Serialize;
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 
-#[cfg(target_os = "unix")]
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 
 use super::{
@@ -24,10 +24,10 @@ const CURRENT_DIR: &str = ".";
 pub struct MetaDataInfo {
     pub size: u64,
 
-    #[cfg(target_os = "unix")]
+    #[cfg(unix)]
     pub owner: u32,
 
-    #[cfg(target_os = "unix")]
+    #[cfg(unix)]
     pub group: u32,
 
     pub created: DateTimeWrap,
@@ -192,7 +192,7 @@ pub async fn get_human_readable_filesize_async<P: AsRef<Path>>(path: P) -> Resul
     Ok(Unit::new(size))
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     use std::time::SystemTime;
 
@@ -215,7 +215,7 @@ pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     })
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub async fn get_metadata_async<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     use std::time::SystemTime;
 
@@ -239,7 +239,7 @@ pub async fn get_metadata_async<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo>
     })
 }
 
-#[cfg(target_os = "unix")]
+#[cfg(unix)]
 pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     let metadata = fs::metadata(path)?;
     Ok(MetaDataInfo {
@@ -251,7 +251,7 @@ pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     })
 }
 
-#[cfg(target_os = "unix")]
+#[cfg(unix)]
 pub async fn get_metadata_async<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
     let metadata = tokio::fs::metadata(path)?;
     Ok(MetaDataInfo {
@@ -265,7 +265,7 @@ pub async fn get_metadata_async<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo>
 
 impl fmt::Display for MetaDataInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        #[cfg(target_os = "unix")]
+        #[cfg(unix)]
         {
             write!(
                 f,
@@ -278,7 +278,7 @@ impl fmt::Display for MetaDataInfo {
             )
         }
 
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         {
             write!(
                 f,
