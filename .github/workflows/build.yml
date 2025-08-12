@@ -7,35 +7,11 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  x86_64:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install cross linker (aarch64 only)
-        if: contains(matrix.target, 'aarch64')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Configure cargo linker for aarch64
-        if: contains(matrix.target, 'aarch64')
-        run: |
-          mkdir -p .cargo
-          cat >> .cargo/config.toml <<'CFG'
-          [target.aarch64-unknown-linux-gnu]
-          linker = "aarch64-linux-gnu-gcc"
-          CFG
-
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -43,13 +19,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
-
+          key: ${{ runner.os }}-cargo-x64-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build x86_64
+        run: cargo build --release
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/<BIN_NAME>
-          if-no-files-found: error
+          name: x86_64-unknown-linux-gnu
+          path: target/release/<BIN_NAME>

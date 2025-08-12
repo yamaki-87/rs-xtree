@@ -253,7 +253,7 @@ pub fn get_metadata<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
 
 #[cfg(unix)]
 pub async fn get_metadata_async<P: AsRef<Path>>(path: P) -> Result<MetaDataInfo> {
-    let metadata = tokio::fs::metadata(path)?;
+    let metadata = tokio::fs::metadata(path).await?;
     Ok(MetaDataInfo {
         size: metadata.len(),
         created: DateTimeWrap::from(metadata.ctime()),
